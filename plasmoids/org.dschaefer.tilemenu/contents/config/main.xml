@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    SPDX-FileCopyrightText: 2026 dschaefer79 <dschaefer79@gmail.com>
+    SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="wideMinWidth" type="Int">
+      <default>5120</default>
+    </entry>
+    <entry name="wideColumns" type="Int">
+      <default>3</default>
+    </entry>
+    <entry name="normalColumns" type="Int">
+      <default>2</default>
+    </entry>
+    <entry name="disabled" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="tileNew" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="showAuto" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="vertical" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="horizontal" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="tallMinHeight" type="Int">
+      <default>2160</default>
+    </entry>
+    <entry name="tallRows" type="Int">
+      <default>3</default>
+    </entry>
+    <entry name="normalRows" type="Int">
+      <default>2</default>
+    </entry>
+    <entry name="gap" type="Int">
+      <default>0</default>
+    </entry>
+    <!-- 0: pixels, 1: millimetres -->
+    <entry name="gapUnitIndex" type="Int">
+      <default>0</default>
+    </entry>
+    <entry name="gapMm" type="Int">
+      <default>2</default>
+    </entry>
+    <entry name="snap" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="snapShiftOnly" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="resizeNeighbours" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="snapShiftSwap" type="Bool">
+      <default>false</default>
+    </entry>
+  </group>
+</kcfg>

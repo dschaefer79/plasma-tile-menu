@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    SPDX-FileCopyrightText: 2026 dschaefer79 <dschaefer79@gmail.com>
+    SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="resolutions" type="StringList">
+      <default>1920x1080,1900x1000,5120x1440</default>
+    </entry>
+    <entry name="addToScreen" type="Bool">
+      <default>true</default>
+    </entry>
+  </group>
+</kcfg>

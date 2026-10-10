@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: 2026 dschaefer79 <dschaefer79@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[Desktop Entry]
+Type=Application
+Name=Window Tiling
+Icon=view-grid
+Actions=TileAuto;Tile4Columns;Tile3Columns;Tile2Columns;Tile3Rows;Tile2Rows;TileGrid2x2;TileGrid3x2;TileGrid4x2;Restore;ToggleAutomaticTiling;ToggleTileNew;ToggleDisabled
+StartupNotify=false
+X-KDE-GlobalShortcutType=Service
+
+[Desktop Action TileAuto]
+Name=Tile automatically
+Exec=plasma-tile-menu tile auto
+X-KDE-Shortcuts=Meta+Alt+A
+
+[Desktop Action Tile4Columns]
+Name=Tile in 4 columns
+Exec=plasma-tile-menu tile 4
+X-KDE-Shortcuts=Meta+Alt+4
+
+[Desktop Action Tile3Columns]
+Name=Tile in 3 columns
+Exec=plasma-tile-menu tile 3
+X-KDE-Shortcuts=Meta+Alt+3
+
+[Desktop Action Tile2Columns]
+Name=Tile in 2 columns
+Exec=plasma-tile-menu tile 2
+X-KDE-Shortcuts=Meta+Alt+2
+
+[Desktop Action Tile3Rows]
+Name=Tile in 3 rows
+Exec=plasma-tile-menu tile rows-3
+X-KDE-Shortcuts=Meta+Ctrl+Alt+3
+
+[Desktop Action Tile2Rows]
+Name=Tile in 2 rows
+Exec=plasma-tile-menu tile rows-2
+X-KDE-Shortcuts=Meta+Ctrl+Alt+2
+
+[Desktop Action TileGrid2x2]
+Name=Tile in 2 × 2 grid
+Exec=plasma-tile-menu tile grid-2x2
+X-KDE-Shortcuts=Meta+Ctrl+2
+
+[Desktop Action TileGrid3x2]
+Name=Tile in 3 × 2 grid
+Exec=plasma-tile-menu tile grid-3x2
+X-KDE-Shortcuts=Meta+Ctrl+3
+
+[Desktop Action TileGrid4x2]
+Name=Tile in 4 × 2 grid
+Exec=plasma-tile-menu tile grid-4x2
+X-KDE-Shortcuts=Meta+Ctrl+4
+
+[Desktop Action Restore]
+Name=Restore windows
+Exec=plasma-tile-menu tile restore
+X-KDE-Shortcuts=Meta+Alt+0
+
+[Desktop Action ToggleAutomaticTiling]
+Name=Turn automatic tiling on or off
+Exec=plasma-tile-menu toggle snap
+X-KDE-Shortcuts=
+
+[Desktop Action ToggleTileNew]
+Name=Turn tiling new windows on or off
+Exec=plasma-tile-menu toggle tileNew
+X-KDE-Shortcuts=
+
+[Desktop Action ToggleDisabled]
+Name=Disable or enable tiling
+Exec=plasma-tile-menu toggle disabled
+X-KDE-Shortcuts=

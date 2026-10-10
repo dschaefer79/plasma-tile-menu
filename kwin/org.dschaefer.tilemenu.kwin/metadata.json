@@ -1,0 +1,20 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "dschaefer79@gmail.com",
+                "Name": "dschaefer79"
+            }
+        ],
+        "Description": "Tile windows into columns, rows or a grid from the Window Tiling widget, and snap dropped windows into place",
+        "EnabledByDefault": true,
+        "Icon": "view-grid",
+        "Id": "org.dschaefer.tilemenu.kwin",
+        "License": "GPL-3.0-or-later",
+        "Name": "Window Tiling Menu",
+        "Version": "1.27"
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}

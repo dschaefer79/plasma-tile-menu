@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Description": "Tile windows into columns, rows or a grid",
+        "Icon": "view-grid",
+        "License": "GPL-3.0-or-later",
+        "Name": "Window Tiling Menu"
+    },
+    "X-KDE-Keywords": "tile,tiling,windows,columns,rows,grid,snap,gap",
+    "X-KDE-System-Settings-Parent-Category": "windowmanagement",
+    "X-KDE-Weight": 90,
+    "X-PlasmaTileMenu-Widget": "tiling"
+}

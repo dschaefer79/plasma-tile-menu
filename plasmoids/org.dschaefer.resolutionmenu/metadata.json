@@ -1,0 +1,22 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "dschaefer79@gmail.com",
+                "Name": "dschaefer79"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Switch the screen resolution from a list you choose",
+        "EnabledByDefault": true,
+        "Icon": "video-display",
+        "Id": "org.dschaefer.resolutionmenu",
+        "License": "GPL-3.0-or-later",
+        "Name": "Resolution Menu",
+        "Version": "1.27"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-NotificationArea": "true",
+    "X-Plasma-NotificationAreaCategory": "Hardware"
+}

@@ -1,0 +1,22 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "dschaefer79@gmail.com",
+                "Name": "dschaefer79"
+            }
+        ],
+        "Category": "Windows and Tasks",
+        "Description": "Tile windows into columns, rows or a grid, restore them, and snap dropped windows into place",
+        "EnabledByDefault": true,
+        "Icon": "view-grid",
+        "Id": "org.dschaefer.tilemenu",
+        "License": "GPL-3.0-or-later",
+        "Name": "Window Tiling",
+        "Version": "1.27"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-NotificationArea": "true",
+    "X-Plasma-NotificationAreaCategory": "SystemServices"
+}

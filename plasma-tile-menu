@@ -1,0 +1,689 @@
+#!/usr/bin/sh
+# SPDX-FileCopyrightText: 2026 dschaefer79 <dschaefer79@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Helper for the Window Tiling and Resolution panel widgets on KDE Plasma.
+#   plasma-tile-menu tile auto|4|3|2|rows-3|rows-2|grid-2x2|grid-3x2|grid-4x2|restore
+#   plasma-tile-menu resolution WIDTHxHEIGHT
+#   plasma-tile-menu add-mode WIDTHxHEIGHT   add the size to the screen's modes
+#   plasma-tile-menu sync-config KEY=VALUE...   settings for the KWin script
+#   plasma-tile-menu toggle snap|tileNew|disabled   flip a switch
+#   plasma-tile-menu get-toggles       print the switches, as KEY=true|false
+#   plasma-tile-menu get-shortcuts     print the keys of the menu entries, as ACTION=KEYS
+#   plasma-tile-menu shortcuts         open the keyboard shortcut settings
+#   plasma-tile-menu setup [--auto]    put both widgets in the system tray
+#   plasma-tile-menu remove            remove both widgets from tray and panels
+#   plasma-tile-menu quit [tiling|resolution]   remove the Window Tiling
+#                                      (default) or Resolution widget; setup
+#                                      puts it back, tiling keeps working
+#   plasma-tile-menu configure [tiling|resolution]   open the settings of the
+#                                      Window Tiling (default) or Resolution widget
+#   plasma-tile-menu export FILE       save the settings of both widgets and
+#                                      the keyboard shortcuts to FILE
+#   plasma-tile-menu import FILE       load them from FILE
+set -u
+
+script_id=org.dschaefer.tilemenu.kwin
+script_js=/usr/share/kwin/scripts/$script_id/contents/code/main.js
+widgets="org.dschaefer.tilemenu org.dschaefer.resolutionmenu"
+confdir="${XDG_CONFIG_HOME:-$HOME/.config}/plasma-tile-menu"
+marker="$confdir/added"
+# Version of the KWin script last loaded, to notice upgrades.
+script_stamp="$confdir/kwin-script"
+# Bump when the panel setup changes, so --auto upgrades existing users.
+setup_version=2
+
+fail() {
+    echo "plasma-tile-menu: $*" >&2
+    command -v notify-send >/dev/null 2>&1 &&
+        notify-send -a "Window Tiling" -i dialog-error "Window Tiling" "$*"
+    exit 1
+}
+
+call() { busctl --user call "$@" >/dev/null; }
+
+# Make sure KWin has the tiling script running, and the installed version
+# of it: after a package upgrade KWin would keep running the old one.
+ensure_script() {
+    kwriteconfig6 --file kwinrc --group Plugins --key "${script_id}Enabled" --type bool true
+    version=$(cksum <"$script_js" 2>/dev/null)
+    loaded=$(busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+        isScriptLoaded s "$script_id" 2>/dev/null)
+    if [ "$loaded" = "b true" ] && [ "$(cat "$script_stamp" 2>/dev/null)" != "$version" ]; then
+        call org.kde.KWin /Scripting org.kde.kwin.Scripting unloadScript s "$script_id"
+        loaded="b false"
+    fi
+    if [ "$loaded" != "b true" ]; then
+        call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+            loadScript ss "$script_js" "$script_id" &&
+        call org.kde.KWin /Scripting org.kde.kwin.Scripting start &&
+        mkdir -p "$confdir" && echo "$version" >"$script_stamp"
+    fi
+}
+
+tile() {
+    case $1 in
+        auto) name="TileMenu Auto" ;;
+        4) name="TileMenu 4" ;;
+        3) name="TileMenu 3" ;;
+        2) name="TileMenu 2" ;;
+        rows-3) name="TileMenu Rows 3" ;;
+        rows-2) name="TileMenu Rows 2" ;;
+        grid-2x2) name="TileMenu Grid 2x2" ;;
+        grid-3x2) name="TileMenu Grid 3x2" ;;
+        grid-4x2) name="TileMenu Grid 4x2" ;;
+        restore) name="TileMenu Restore" ;;
+        *) fail "unknown tile action: $1" ;;
+    esac
+    ensure_script
+    call org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component \
+        invokeShortcut s "$name" || fail "KWin did not accept \"$name\""
+}
+
+sync_config() {
+    [ $# -gt 0 ] || fail "usage: plasma-tile-menu sync-config KEY=VALUE..."
+    group="Script-$script_id"
+    for pair in "$@"; do
+        key=${pair%%=*} value=${pair#*=}
+        case $key in
+            wideMinWidth|wideColumns|normalColumns|tallMinHeight|tallRows|normalRows|gap|gapMm)
+                case $value in
+                    ''|*[!0-9]*) fail "$key needs a number" ;;
+                esac
+                kwriteconfig6 --file kwinrc --group "$group" --key "$key" "$value" ;;
+            disabled|tileNew|snap|snapShiftOnly|snapShiftSwap|resizeNeighbours|vertical|horizontal)
+                case $value in
+                    true|false) ;;
+                    *) fail "$key needs true or false" ;;
+                esac
+                kwriteconfig6 --file kwinrc --group "$group" --key "$key" --type bool "$value" ;;
+            gapUnit)
+                case $value in
+                    px|mm) ;;
+                    *) fail "$key needs px or mm" ;;
+                esac
+                kwriteconfig6 --file kwinrc --group "$group" --key "$key" "$value" ;;
+            *) fail "unknown setting: $key" ;;
+        esac
+    done
+    # The KWin script cannot see how large the screens are, which it needs
+    # for a gap in millimetres: pass their widths, as NAME=MM;NAME=MM.
+    sizes=$(kscreen-doctor -j 2>/dev/null | python3 -I -c '
+import json, sys
+outputs = json.load(sys.stdin).get("outputs", [])
+print(";".join("%s=%d" % (o["name"], o["sizeMM"]["width"]) for o in outputs
+               if o.get("name") and o.get("sizeMM", {}).get("width")))
+' 2>/dev/null)
+    kwriteconfig6 --file kwinrc --group "$group" --key screenWidthsMm "$sizes"
+    ensure_script
+    register_shortcuts
+    call org.kde.KWin /KWin org.kde.KWin reconfigure
+}
+
+# The "Window Tiling" group in System Settings > Shortcuts comes from
+# shortcuts_file; registering one of its actions makes KDE's shortcut
+# service load them all, without logging out after the package is installed.
+shortcuts_file=org.dschaefer.tilemenu.desktop
+shortcuts_path=/usr/share/kglobalaccel/$shortcuts_file
+register_shortcuts() {
+    shortcuts_stale && restart_kglobalaccel
+    shortcuts_missing && reload_shortcuts
+    busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+        doRegister as 4 "$shortcuts_file" TileAuto "Window Tiling" "Tile automatically" \
+        >/dev/null 2>&1
+}
+
+# True if the shortcut service has the "Window Tiling" actions loaded but
+# lacks some of those in shortcuts_file.
+shortcuts_missing() {
+    known=$(busctl --user call org.kde.kglobalaccel /component/org_dschaefer_tilemenu_desktop \
+        org.kde.kglobalaccel.Component shortcutNames 2>/dev/null) || return 1
+    for action in $(sed -n 's/^\[Desktop Action \(.*\)\]$/\1/p' "$shortcuts_path"); do
+        case $known in *"\"$action\""*) ;; *) return 0 ;; esac
+    done
+    return 1
+}
+
+# On Wayland the shortcut service runs inside KWin and cannot be restarted;
+# it keeps its copy of shortcuts_file, so actions added since KWin started
+# (such as "Tile in 4 columns") are missing.
+# Unregistering every action drops the component; registering again
+# reads the file anew. The keys set in System Settings are kept.
+reload_shortcuts() {
+    keys=$(mktemp) || return
+    get_shortcuts >"$keys"
+    for action in $(busctl --user call org.kde.kglobalaccel /component/org_dschaefer_tilemenu_desktop \
+            org.kde.kglobalaccel.Component shortcutNames 2>/dev/null | grep -o '"[^"]*"' | tr -d '"'); do
+        busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+            unregister ss "$shortcuts_file" "$action" >/dev/null 2>&1
+    done
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+            allComponents 2>/dev/null | grep -q '/component/org_dschaefer_tilemenu_desktop"' || break
+        sleep 0.3
+    done
+    busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+        doRegister as 4 "$shortcuts_file" TileAuto "Window Tiling" "Tile automatically" \
+        >/dev/null 2>&1
+    set_shortcut_keys "$keys" >/dev/null 2>&1
+    rm -f "$keys"
+}
+
+# The shortcut service reads shortcuts_file only when it starts: after an
+# upgrade it keeps the old actions and default keys (such as no "Tile in 4
+# columns", and no keys at all) until it is restarted. True if it has the
+# actions loaded and the file was installed after it started.
+shortcuts_stale() {
+    busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+        allComponents 2>/dev/null | grep -q '/component/org_dschaefer_tilemenu_desktop"' || return 1
+    pid=$(pgrep -u "$(id -u)" -x kglobalacceld | head -1)
+    [ -n "$pid" ] || return 1
+    started=$(( $(date +%s) - $(ps -o etimes= -p "$pid") ))
+    # The change time: installing keeps the file's own modification time.
+    [ "$(stat -c %Z "$shortcuts_path")" -gt "$started" ]
+}
+
+# KDE applications register their shortcuts again by themselves.
+restart_kglobalaccel() {
+    if systemctl --user -q is-active plasma-kglobalaccel.service 2>/dev/null; then
+        systemctl --user restart plasma-kglobalaccel.service
+    else
+        pkill -u "$(id -u)" -x kglobalacceld
+        setsid -f /usr/libexec/kglobalacceld >/dev/null 2>&1
+    fi
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        busctl --user status org.kde.kglobalaccel >/dev/null 2>&1 && return
+        sleep 0.3
+    done
+}
+
+# The switches live in the KWin script's settings, so keyboard shortcuts can
+# flip them; the panel widget picks the change up from there.
+toggle() {
+    case $1 in
+        snap) label="Automatic tiling" ;;
+        tileNew) label="Tile new windows" ;;
+        disabled) label="Disable tiling" ;;
+        *) fail "usage: plasma-tile-menu toggle snap|tileNew|disabled" ;;
+    esac
+    group="Script-$script_id"
+    if [ "$(kreadconfig6 --file kwinrc --group "$group" --key "$1" --default false)" = true ]; then
+        value=false state=off
+    else
+        value=true state=on
+    fi
+    kwriteconfig6 --file kwinrc --group "$group" --key "$1" --type bool "$value"
+    ensure_script
+    call org.kde.KWin /KWin org.kde.KWin reconfigure
+    command -v notify-send >/dev/null 2>&1 &&
+        notify-send -a "Window Tiling" -i view-grid -t 2000 "Window Tiling" "$label: $state"
+    :
+}
+
+get_toggles() {
+    group="Script-$script_id"
+    for key in snap tileNew disabled; do
+        echo "$key=$(kreadconfig6 --file kwinrc --group "$group" --key "$key" --default false)"
+    done
+}
+
+shortcuts() {
+    register_shortcuts
+    # Opens the page on the Window Tiling group where supported.
+    systemsettings kcm_keys --args "$shortcuts_file" >/dev/null 2>&1 &
+}
+
+# Print "OUTPUT MODE_ID WIDTHxHEIGHT" for the primary enabled output and its fastest mode
+# of size $1. Exit 2 without a screen, 3 (printing OUTPUT) without the mode.
+# KWin rounds custom mode widths to a multiple of 8 (1900 becomes 1896), so
+# a mode up to 7 pixels narrower or wider counts too.
+find_mode() {
+    kscreen-doctor -j 2>/dev/null | python3 -I -c '
+import json, sys
+want_w, want_h = (int(v) for v in sys.argv[1].split("x"))
+outputs = [o for o in json.load(sys.stdin).get("outputs", [])
+           if o.get("enabled") and o.get("connected", True)]
+if not outputs:
+    sys.exit(2)
+out = min(outputs, key=lambda o: o.get("priority") or 99)
+def size(m):
+    s = m.get("size", {})
+    return s.get("width", 0), s.get("height", 0)
+modes = [m for m in out.get("modes", []) if size(m) == (want_w, want_h)]
+if not modes:
+    modes = [m for m in out.get("modes", [])
+             if size(m)[1] == want_h and abs(size(m)[0] - want_w) < 8]
+if not modes:
+    print(out["name"])
+    sys.exit(3)
+best = max(modes, key=lambda m: (size(m)[0] == want_w, m.get("refreshRate", 0)))
+print(out["name"], best["id"], "%dx%d" % size(best))
+' "$1"
+}
+
+check_size() {
+    case $1 in
+        [1-9]*x[1-9]*) ;;
+        *) fail "usage: plasma-tile-menu $2 WIDTHxHEIGHT" ;;
+    esac
+    case ${1%x*}${1#*x} in *[!0-9]*) fail "invalid resolution: $1" ;; esac
+}
+
+# Wayland: make sure the screen offers $1, adding it as a 60 Hz custom mode,
+# which KWin keeps. Print "OUTPUT MODE_ID WIDTHxHEIGHT added|present".
+wayland_mode() {
+    state=present
+    target=$(find_mode "$1")
+    rc=$?
+    if [ $rc -eq 3 ] && [ -n "$target" ]; then
+        state=added
+        w=${1%x*} h=${1#*x}
+        kscreen-doctor "output.$target.addCustomMode.$w.$h.60000.reduced" >/dev/null 2>&1 ||
+            fail "could not add $1 to screen $target"
+        # Wait for the new mode to show up.
+        i=0
+        while [ $i -lt 10 ]; do
+            sleep 0.5
+            target=$(find_mode "$1")
+            rc=$?
+            [ $rc -eq 3 ] || break
+            i=$((i + 1))
+        done
+    fi
+    case $rc in
+        0) ;;
+        2) fail "no enabled screen found" ;;
+        3) fail "screen ${target:-?} does not offer $1" ;;
+        *) fail "could not read the screen setup (kscreen-doctor)" ;;
+    esac
+    echo "$target $state"
+}
+
+# X11: make sure the first connected output offers $1, adding it with
+# xrandr like xfce-resolution-menu does. Print "OUTPUT added|present".
+x11_mode() {
+    command -v xrandr >/dev/null 2>&1 || fail "xrandr is not installed"
+    out=$(xrandr --query | awk '$2 == "connected" { print $1; exit }')
+    [ -n "$out" ] || fail "no connected output found"
+    if xrandr --query | awk -v o="$out" -v m="$1" '
+            $1 == o { inside = 1; next }
+            inside && /^[^ \t]/ { exit }
+            inside && $1 == m { found = 1; exit }
+            END { exit !found }'; then
+        echo "$out present"
+        return
+    fi
+    w=${1%x*} h=${1#*x}
+    # VNC servers accept any size; real outputs need proper CVT timings.
+    timings=""
+    case $out in
+        VNC-*) ;;
+        *) command -v cvt >/dev/null 2>&1 &&
+               timings=$(cvt "$w" "$h" 60 | sed -n 's/^Modeline "[^"]*" *//p') ;;
+    esac
+    [ -n "$timings" ] || timings="0 $w $w $w $w $h $h $h $h"
+    # --newmode fails harmlessly if the mode exists but isn't on this output.
+    xrandr --newmode "$1" $timings 2>/dev/null
+    xrandr --addmode "$out" "$1" || fail "could not add $1 to $out"
+    echo "$out added"
+}
+
+is_wayland() {
+    [ -n "${WAYLAND_DISPLAY:-}" ] || [ "${XDG_SESSION_TYPE:-}" = wayland ]
+}
+
+resolution() {
+    check_size "$1" resolution
+    if is_wayland; then
+        target=$(wayland_mode "$1") || exit 1
+        set -- $target
+        kscreen-doctor "output.$1.mode.$2" >/dev/null 2>&1 ||
+            fail "could not switch $1 to the requested resolution"
+    else
+        target=$(x11_mode "$1") || exit 1
+        set -- $target "$1"
+        xrandr --output "$1" --mode "$3" || fail "could not switch $1 to $3"
+    fi
+}
+
+# Add the size to the screen without switching to it, and say what happened.
+add_mode() {
+    check_size "$1" add-mode
+    want=$1 as=""
+    if is_wayland; then
+        target=$(wayland_mode "$want") || exit 1
+        set -- $target
+        out=$1 state=$4
+        # KWin rounds the width to a multiple of 8.
+        [ "$3" = "$want" ] || as=" as $3"
+    else
+        target=$(x11_mode "$want") || exit 1
+        set -- $target
+        out=$1 state=$2
+    fi
+    if [ "$state" = added ]; then
+        echo "Added $want to screen $out$as."
+    else
+        echo "Screen $out already offers $want$as."
+    fi
+}
+
+plasma_eval() {
+    busctl --user call org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell \
+        evaluateScript s "$1"
+}
+
+setup() {
+    if [ "${1:-}" = --auto ]; then
+        case $(cat "$marker" 2>/dev/null) in
+            "$setup_version"|removed) return ;;
+        esac
+        # At login, wait for Plasma to come up.
+        i=0
+        until busctl --user status org.kde.plasmashell >/dev/null 2>&1; do
+            i=$((i + 1))
+            [ $i -le 60 ] || exit 0
+            sleep 1
+        done
+        sleep 3
+    fi
+    ensure_script
+    register_shortcuts
+    # Put the widgets in every system tray and take them off the panels.
+    # Without a tray, add them to the top panel (else the first one).
+    plasma_eval '
+var ids = ["org.dschaefer.tilemenu", "org.dschaefer.resolutionmenu"];
+var all = panels();
+var trays = [];
+all.forEach(function (panel) {
+    panel.widgets("org.kde.plasma.systemtray").forEach(function (t) { trays.push(t); });
+});
+if (trays.length > 0) {
+    all.forEach(function (panel) {
+        ids.forEach(function (id) {
+            panel.widgets(id).forEach(function (w) { w.remove(); });
+        });
+    });
+    trays.forEach(function (tray) {
+        tray.currentConfigGroup = ["General"];
+        ["extraItems", "knownItems"].forEach(function (key) {
+            var items = String(tray.readConfig(key, "")).split(",")
+                .filter(function (s) { return s.length > 0; });
+            ids.forEach(function (id) {
+                if (items.indexOf(id) < 0) items.push(id);
+            });
+            tray.writeConfig(key, items);
+        });
+        tray.reloadConfig();
+    });
+} else if (all.length > 0) {
+    var panel = all[0];
+    for (var i = 0; i < all.length; i++)
+        if (all[i].location == "top") { panel = all[i]; break; }
+    ids.forEach(function (id) {
+        if (panel.widgets(id).length == 0)
+            panel.addWidget(id);
+    });
+}' >/dev/null || fail "could not add the widgets (is Plasma running?)"
+    mkdir -p "$confdir"
+    echo "$setup_version" >"$marker"
+}
+
+# remove [WIDGET...]: both widgets unless given.
+remove() {
+    [ $# -gt 0 ] || set -- $widgets
+    ids=$(printf '"%s",' "$@")
+    # First, as Quit runs from the widget it removes.
+    mkdir -p "$confdir"
+    echo removed >"$marker"
+    # Keep the ids in knownItems so the tray does not enable them again.
+    plasma_eval '
+var ids = ['"${ids%,}"'];
+panels().forEach(function (panel) {
+    ids.forEach(function (id) {
+        panel.widgets(id).forEach(function (w) { w.remove(); });
+    });
+    panel.widgets("org.kde.plasma.systemtray").forEach(function (tray) {
+        tray.currentConfigGroup = ["General"];
+        var items = String(tray.readConfig("extraItems", "")).split(",")
+            .filter(function (s) { return s.length > 0 && ids.indexOf(s) < 0; });
+        tray.writeConfig("extraItems", items);
+        tray.reloadConfig();
+    });
+});' >/dev/null || fail "could not reach Plasma"
+}
+
+# The keys of the "Window Tiling" shortcuts, as ACTION=KEYS (empty for
+# none): those set in System Settings, else the defaults of shortcuts_file.
+get_shortcuts() {
+    awk -F= '
+        /^\[Desktop Action / { action = substr($0, 17, length($0) - 17) }
+        /^X-KDE-Shortcuts=/ && action != "" { print action "=" $2 }
+    ' "$shortcuts_path" | while IFS== read -r action keys; do
+        set=$(kreadconfig6 --file kglobalshortcutsrc --group services \
+            --group "$shortcuts_file" --key "$action" 2>/dev/null)
+        if [ -n "$set" ]; then
+            # Several shortcuts are separated by tabs; show the first.
+            keys=$(printf '%s' "$set" | cut -f1)
+            [ "$keys" != none ] || keys=
+        fi
+        echo "$action=$keys"
+    done
+}
+
+# The widgets keep a copy of their settings here (store-config), for
+# export; import leaves each widget its part (take-import).
+settings_copy() { echo "$confdir/$1.conf"; }
+settings_import() { echo "$confdir/import-$1.conf"; }
+
+# store-config tiling|resolution KEY=VALUE...: numbers, true/false and
+# lists of sizes only.
+store_config() {
+    section=$1
+    shift
+    case $section in tiling|resolution) ;; *) fail "unknown settings: $section" ;; esac
+    for pair in "$@"; do
+        case $pair in
+            [A-Za-z]*=*) ;;
+            *) fail "bad setting: $pair" ;;
+        esac
+        case ${pair#*=} in *[!A-Za-z0-9x,.-]*) fail "bad value: $pair" ;; esac
+    done
+    mkdir -p "$confdir"
+    file=$(settings_copy "$section")
+    printf '%s\n' "$@" >"$file.tmp" && mv -f "$file.tmp" "$file"
+}
+
+# The settings file: [tiling], [resolution] and [shortcuts] sections of
+# KEY=VALUE lines.
+export_settings() {
+    {
+        echo "# Window Tiling and Resolution settings, from plasma-tile-menu export"
+        for section in tiling resolution; do
+            [ -r "$(settings_copy "$section")" ] || continue
+            echo "[$section]"
+            cat "$(settings_copy "$section")"
+        done
+        echo "[shortcuts]"
+        get_shortcuts
+    } >"$1.tmp" && mv -f "$1.tmp" "$1" || { rm -f "$1.tmp"; fail "could not write $1"; }
+}
+
+# Prints the loaded settings as SECTION.KEY=VALUE, for the settings page.
+import_settings() {
+    [ -r "$1" ] || fail "cannot read $1"
+    grep -q '^\[\(tiling\|resolution\|shortcuts\)\]$' "$1" ||
+        fail "$1 is not a Window Tiling settings file"
+    mkdir -p "$confdir"
+    for section in tiling resolution shortcuts; do
+        : >"$(settings_import "$section").tmp"
+    done
+    section=
+    while IFS= read -r line || [ -n "$line" ]; do
+        case $line in
+            ''|'#'*) continue ;;
+            '['*']') section=${line#[}; section=${section%]}; continue ;;
+        esac
+        key=${line%%=*} value=${line#*=}
+        case $key in ''|*[!A-Za-z0-9]*) continue ;; esac
+        case $section in
+            tiling|resolution)
+                case $value in *[!A-Za-z0-9x,.-]*) continue ;; esac ;;
+            shortcuts)
+                case $value in *[!A-Za-z0-9+,.\;\'/=\[\]\`-]*) continue ;; esac ;;
+            *) continue ;;
+        esac
+        echo "$key=$value" >>"$(settings_import "$section").tmp"
+        echo "$section.$key=$value"
+    done <"$1"
+    for section in tiling resolution; do
+        if [ -s "$(settings_import "$section").tmp" ]; then
+            mv -f "$(settings_import "$section").tmp" "$(settings_import "$section")"
+        else
+            rm -f "$(settings_import "$section").tmp"
+        fi
+    done
+    problem=$(apply_shortcuts "$(settings_import shortcuts).tmp" 2>&1) || :
+    rm -f "$(settings_import shortcuts).tmp"
+    [ -z "$problem" ] || fail "$problem"
+}
+
+# Give the "Window Tiling" shortcuts the keys in FILE (ACTION=KEYS lines,
+# empty for none), through KDE's shortcut service. On Wayland it runs inside
+# KWin, so it cannot be restarted; it saves the keys itself.
+apply_shortcuts() {
+    [ -s "$1" ] || return 0
+    register_shortcuts
+    set_shortcut_keys "$1"
+}
+
+set_shortcut_keys() {
+    python3 -I - "$1" "$shortcuts_path" "$shortcuts_file" <<'EOF'
+import re, subprocess, sys
+
+keys_file, desktop_path, component = sys.argv[1:]
+# Action names and their labels from the shortcuts file.
+names, action = {}, None
+with open(desktop_path) as f:
+    for line in f:
+        line = line.rstrip("\n")
+        m = re.match(r"\[Desktop Action (\w+)\]$", line)
+        if m:
+            action = m.group(1)
+        elif line.startswith("[") or not action:
+            action = None
+        elif line.startswith("Name="):
+            names[action] = line[5:]
+
+MODIFIERS = {"meta": 0x10000000, "ctrl": 0x04000000, "alt": 0x08000000, "shift": 0x02000000}
+NAMED = {"esc": 0x01000000, "escape": 0x01000000, "tab": 0x01000001, "backspace": 0x01000003,
+         "return": 0x01000004, "enter": 0x01000005, "ins": 0x01000006, "insert": 0x01000006,
+         "del": 0x01000007, "delete": 0x01000007, "pause": 0x01000008, "print": 0x01000009,
+         "home": 0x01000010, "end": 0x01000011, "left": 0x01000012, "up": 0x01000013,
+         "right": 0x01000014, "down": 0x01000015, "pgup": 0x01000016, "pgdown": 0x01000017,
+         "space": 0x20}
+
+
+def key_code(text):
+    """Qt's number for a key combination such as "Meta+Alt+4", or None."""
+    parts = text.split("+")
+    if text.endswith("++"):
+        parts = parts[:-2] + ["+"]
+    code = 0
+    for mod in parts[:-1]:
+        if mod.lower() not in MODIFIERS:
+            return None
+        code |= MODIFIERS[mod.lower()]
+    key = parts[-1]
+    if len(key) == 1 and 0x20 < ord(key.upper()) < 0x7f:
+        return code | ord(key.upper())
+    m = re.fullmatch(r"[Ff]([1-9][0-9]?)", key)
+    if m and int(m.group(1)) <= 35:
+        return code | (0x01000030 + int(m.group(1)) - 1)
+    if key.lower() in NAMED:
+        return code | NAMED[key.lower()]
+    return None
+
+
+failed = []
+with open(keys_file) as f:
+    for line in f:
+        action, _, keys = line.rstrip("\n").partition("=")
+        if action not in names:
+            continue
+        codes = []
+        for combo in filter(None, keys.split("\t")[:1]):
+            code = key_code(combo)
+            if code is None:
+                failed.append(f"{action}: {combo}")
+            else:
+                codes.append(code)
+        if keys and not codes:
+            continue
+        sequences = [str(len(codes))] + [x for c in codes for x in ("1", str(c))]
+        # Flags: SetPresent (2) | NoAutoloading (4): set these keys now.
+        result = subprocess.run(
+            ["busctl", "--user", "call", "org.kde.kglobalaccel", "/kglobalaccel",
+             "org.kde.KGlobalAccel", "setShortcutKeys", "asa(ai)u",
+             "4", component, action, "Window Tiling", names[action], *sequences, "6"],
+            capture_output=True, text=True)
+        if result.returncode != 0:
+            failed.append(f"{action}: {result.stderr.strip()}")
+if failed:
+    sys.exit("some keyboard shortcuts could not be set: " + "; ".join(failed))
+EOF
+}
+
+# Print and forget the settings import left for a widget, after a
+# "configure" line if its settings were asked for (see configure).
+take_import() {
+    request="$confdir/configure-$1"
+    if [ -e "$request" ]; then
+        # Not a request left from long ago, when the widget was not there.
+        [ $(( $(date +%s) - $(stat -c %Y "$request") )) -le 30 ] && echo configure
+        rm -f "$request"
+    fi
+    file=$(settings_import "$1")
+    [ -r "$file" ] || return 0
+    cat "$file"
+    rm -f "$file"
+}
+
+# Open a widget's settings, for its entry in System Settings: the widget
+# checks for the request every few seconds. A widget taken off with Quit
+# is put back first.
+configure() {
+    case $1 in
+        tiling|resolution) ;;
+        *) fail "usage: plasma-tile-menu configure [tiling|resolution]" ;;
+    esac
+    [ "$(cat "$marker" 2>/dev/null)" = removed ] && setup
+    mkdir -p "$confdir"
+    touch "$confdir/configure-$1"
+}
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+case $cmd in
+    tile) [ $# -eq 1 ] || fail "usage: plasma-tile-menu tile auto|4|3|2|rows-3|rows-2|grid-2x2|grid-3x2|grid-4x2|restore"; tile "$1" ;;
+    resolution) [ $# -eq 1 ] || fail "usage: plasma-tile-menu resolution WIDTHxHEIGHT"; resolution "$1" ;;
+    add-mode) [ $# -eq 1 ] || fail "usage: plasma-tile-menu add-mode WIDTHxHEIGHT"; add_mode "$1" ;;
+    sync-config) sync_config "$@" ;;
+    toggle) [ $# -eq 1 ] || fail "usage: plasma-tile-menu toggle snap|tileNew|disabled"; toggle "$1" ;;
+    get-toggles) get_toggles ;;
+    get-shortcuts) get_shortcuts ;;
+    store-config) [ $# -ge 1 ] || fail "usage: plasma-tile-menu store-config tiling|resolution KEY=VALUE..."; store_config "$@" ;;
+    take-import) [ $# -eq 1 ] || fail "usage: plasma-tile-menu take-import tiling|resolution"; take_import "$1" ;;
+    configure) configure "${1:-tiling}" ;;
+    export) [ $# -eq 1 ] || fail "usage: plasma-tile-menu export FILE"; export_settings "$1" ;;
+    import) [ $# -eq 1 ] || fail "usage: plasma-tile-menu import FILE"; import_settings "$1" ;;
+    shortcuts) shortcuts ;;
+    setup) setup "${1:-}" ;;
+    remove) remove ;;
+    quit)
+        case ${1:-tiling} in
+            tiling) remove org.dschaefer.tilemenu ;;
+            resolution) remove org.dschaefer.resolutionmenu ;;
+            *) fail "usage: plasma-tile-menu quit [tiling|resolution]" ;;
+        esac ;;
+    *) sed -n '4,23s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+esac
