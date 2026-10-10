@@ -28,6 +28,13 @@ sudo dnf copr enable dschaefer79/plasma-tile-menu
 sudo dnf install plasma-tile-menu
 ```
 
+On Ubuntu 26.04 (Kubuntu), from the GitHub release:
+
+```
+wget https://github.com/dschaefer79/plasma-tile-menu/releases/download/v1.34/plasma-tile-menu_1.34_ubuntu26.04_amd64.deb
+sudo apt install ./plasma-tile-menu_1.34_ubuntu26.04_amd64.deb
+```
+
 The widgets appear in the system tray at the next login, or right away
 after `plasma-tile-menu setup`.
 
@@ -40,6 +47,15 @@ sudo dnf builddep packaging/plasma-tile-menu.spec
 version=$(rpmspec -q --qf '%{version}\n' packaging/plasma-tile-menu.spec | head -1)
 git archive --prefix=plasma-tile-menu-$version/ -o ~/rpmbuild/SOURCES/plasma-tile-menu-$version.tar.gz HEAD
 rpmbuild -ba packaging/plasma-tile-menu.spec
+```
+
+The Debian packaging for Ubuntu is in `packaging/debian/`. From a checkout,
+on Ubuntu:
+
+```
+cp -r packaging/debian debian
+sudo apt build-dep ./
+dpkg-buildpackage -b -us -uc
 ```
 
 The widgets, the KWin script and the System Settings pages work together

@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+# SPDX-FileCopyrightText: 2026 dschaefer79 <dschaefer79@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+D = debian/plasma-tile-menu
+
+%:
+	dh $@ --buildsystem=cmake --sourcedirectory=kcm
+
+override_dh_auto_install:
+	dh_auto_install --destdir=$(D)
+	install -Dpm 0755 plasma-tile-menu $(D)/usr/bin/plasma-tile-menu
+	install -Dpm 0644 plasma-tile-menu.desktop $(D)/usr/share/applications/plasma-tile-menu.desktop
+	install -Dpm 0644 plasma-tile-menu-setup.desktop $(D)/etc/xdg/autostart/plasma-tile-menu-setup.desktop
+	install -Dpm 0644 org.dschaefer.tilemenu.desktop $(D)/usr/share/kglobalaccel/org.dschaefer.tilemenu.desktop
+	install -dm 0755 $(D)/usr/share/kwin/scripts $(D)/usr/share/plasma/plasmoids
+	cp -pr kwin/org.dschaefer.tilemenu.kwin $(D)/usr/share/kwin/scripts/
+	cp -pr plasmoids/org.dschaefer.tilemenu plasmoids/org.dschaefer.resolutionmenu $(D)/usr/share/plasma/plasmoids/
+	find $(D)/usr/share/plasma $(D)/usr/share/kwin -type f -exec chmod 0644 {} +
+	install -Dpm 0644 -t $(D)/usr/share/icons/hicolor/scalable/actions icons/*.svg
+	# Check what was installed (dh_auto_test runs before the install)
+	desktop-file-validate $(D)/usr/share/applications/plasma-tile-menu.desktop
+	desktop-file-validate $(D)/etc/xdg/autostart/plasma-tile-menu-setup.desktop
+	desktop-file-validate $(D)/usr/share/kglobalaccel/org.dschaefer.tilemenu.desktop
+	find $(D) -name metadata.json -exec python3 -m json.tool {} \; >/dev/null

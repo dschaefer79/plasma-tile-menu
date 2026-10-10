@@ -1,0 +1,49 @@
+Source: plasma-tile-menu
+Section: kde
+Priority: optional
+Maintainer: dschaefer79 <dschaefer79@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               extra-cmake-modules,
+               g++,
+               qt6-base-dev,
+               qt6-declarative-dev,
+               libkf6coreaddons-dev,
+               libkf6kcmutils-dev,
+               desktop-file-utils
+Standards-Version: 4.7.0
+Homepage: https://github.com/dschaefer79/plasma-tile-menu
+Rules-Requires-Root: no
+
+Package: plasma-tile-menu
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         kwin-wayland | kwin-x11,
+         plasma-workspace (>= 4:6.0),
+         systemsettings,
+         libkf6config-bin,
+         libkscreen-bin,
+         systemd,
+         python3,
+         qml6-module-org-kde-kcmutils,
+         qml6-module-org-kde-kirigami,
+         qml6-module-qtquick-dialogs
+Recommends: libnotify-bin,
+            x11-xserver-utils,
+            xcvt
+Description: KDE Plasma system tray menus for window tiling and screen resolution
+ Two KDE Plasma 6 system tray widgets.
+ .
+ Window Tiling tiles the windows of the current desktop into columns, rows
+ or a grid (automatically, or 2, 3 or 4 columns, 2 or 3 rows, a 2x2, 3x2 or
+ 4x2 grid), puts them back with Restore, can tile new windows as they open
+ and snaps dropped windows into the column, row or grid cell under the
+ pointer. The tiling runs in a KWin script.
+ .
+ Resolution Menu switches the screen resolution with kscreen-doctor from a
+ list you edit, adding sizes the screen does not offer (KWin custom modes on
+ Wayland, xrandr on X11).
+ .
+ Both widgets are put in each user's system tray at their next login, or
+ right away by running plasma-tile-menu setup.

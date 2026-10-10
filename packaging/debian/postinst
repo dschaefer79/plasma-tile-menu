@@ -1,0 +1,22 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 dschaefer79 <dschaefer79@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -e
+
+# For users who are logged in: KDE's shortcut service reads the "Window
+# Tiling" shortcuts only when it starts, so restart it to load this
+# version's actions and default keys; then restart Plasma, so the new
+# widgets are used.
+if [ "$1" = configure ]; then
+    for user in $(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}'); do
+        for service in plasma-kglobalaccel.service plasma-plasmashell.service; do
+            if systemctl --user -M "$user@" is-active -q $service 2>/dev/null; then
+                systemctl --user -M "$user@" restart $service >/dev/null 2>&1 || :
+            fi
+        done
+    done
+fi
+
+#DEBHELPER#
+
+exit 0
