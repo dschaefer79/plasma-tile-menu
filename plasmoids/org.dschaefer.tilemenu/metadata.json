@@ -14,7 +14,7 @@
         "Id": "org.dschaefer.tilemenu",
         "License": "GPL-3.0-or-later",
         "Name": "Window Tiling",
-        "Version": "1.27"
+        "Version": "1.35"
     },
     "X-Plasma-API-Minimum-Version": "6.0",
     "X-Plasma-NotificationArea": "true",

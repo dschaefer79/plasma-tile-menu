@@ -4,7 +4,7 @@
 %global source_date_epoch_from_changelog 0
 
 Name:           plasma-tile-menu
-Version:        1.34
+Version:        1.35
 Release:        1%{?dist}
 Summary:        KDE Plasma system tray menus for window tiling and screen resolution
 License:        GPL-3.0-or-later
@@ -117,6 +117,11 @@ done
 %{_datadir}/icons/hicolor/scalable/actions/tilemenu-*-symbolic.svg
 
 %changelog
+* Sun Oct 11 2026 dschaefer79 <7472357+dschaefer79@users.noreply.github.com> - 1.35-1
+- The widgets also load on Plasma 6.3 (Debian 13): their menus close on
+  losing the focus without the popup window's hideOnWindowDeactivate
+- Packages for Fedora 44 and 45, Ubuntu 26.04 and 26.10 and Debian 13
+
 * Sun Oct 11 2026 dschaefer79 <dschaefer79@gmail.com> - 1.34-1
 - README.md, describing the widgets and noting that the software was
   written entirely with Claude, Anthropic's AI assistant; the package

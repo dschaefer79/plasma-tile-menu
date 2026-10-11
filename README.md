@@ -21,27 +21,34 @@ and Display & Monitor > Resolution Menu.
 
 ## Installing
 
-On Fedora 45 with KDE Plasma 6, from Copr:
+From the [latest GitHub release](https://github.com/dschaefer79/plasma-tile-menu/releases/latest):
+
+| System | Plasma | Package |
+|---|---|---|
+| Fedora 45 | 6.7 | `plasma-tile-menu-1.35-1.fc45.x86_64.rpm` |
+| Fedora 44 | 6.7 | `plasma-tile-menu-1.35-1.fc44.x86_64.rpm` |
+| Ubuntu 26.10 (Kubuntu) | 6.7 | `plasma-tile-menu_1.35_ubuntu26.10_amd64.deb` |
+| Ubuntu 26.04 (Kubuntu) | 6.6 | `plasma-tile-menu_1.35_ubuntu26.04_amd64.deb` |
+| Debian 13 (trixie) | 6.3 | `plasma-tile-menu_1.35_debian13_amd64.deb` |
+
+On Fedora:
 
 ```
-sudo dnf copr enable dschaefer79/plasma-tile-menu
-sudo dnf install plasma-tile-menu
+sudo dnf install https://github.com/dschaefer79/plasma-tile-menu/releases/download/v1.35/plasma-tile-menu-1.35-1.fc45.x86_64.rpm
 ```
 
-On Ubuntu 26.04 (Kubuntu), from the GitHub release:
+(`fc44` instead of `fc45` on Fedora 44). The package is also built in
+Copr: `sudo dnf copr enable dschaefer79/plasma-tile-menu` and
+`sudo dnf install plasma-tile-menu`.
+
+On Ubuntu and Debian, for example Ubuntu 26.10:
 
 ```
-wget https://github.com/dschaefer79/plasma-tile-menu/releases/download/v1.34/plasma-tile-menu_1.34_ubuntu26.04_amd64.deb
-sudo apt install ./plasma-tile-menu_1.34_ubuntu26.04_amd64.deb
+wget https://github.com/dschaefer79/plasma-tile-menu/releases/download/v1.35/plasma-tile-menu_1.35_ubuntu26.10_amd64.deb
+sudo apt install ./plasma-tile-menu_1.35_ubuntu26.10_amd64.deb
 ```
 
-On Debian 13 (trixie), from the GitHub release (1.34 with a fix for
-Plasma 6.3):
-
-```
-wget https://github.com/dschaefer79/plasma-tile-menu/releases/download/v1.34/plasma-tile-menu_1.34+deb13_debian13_amd64.deb
-sudo apt install ./plasma-tile-menu_1.34+deb13_debian13_amd64.deb
-```
+(`ubuntu26.04` or `debian13` instead of `ubuntu26.10` on those systems).
 
 The widgets appear in the system tray at the next login, or right away
 after `plasma-tile-menu setup`.

@@ -13,7 +13,7 @@
         "Id": "org.dschaefer.tilemenu.kwin",
         "License": "GPL-3.0-or-later",
         "Name": "Window Tiling Menu",
-        "Version": "1.27"
+        "Version": "1.35"
     },
     "X-Plasma-API": "javascript",
     "X-Plasma-MainScript": "code/main.js"
