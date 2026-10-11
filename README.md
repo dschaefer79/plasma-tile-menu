@@ -35,6 +35,14 @@ wget https://github.com/dschaefer79/plasma-tile-menu/releases/download/v1.34/pla
 sudo apt install ./plasma-tile-menu_1.34_ubuntu26.04_amd64.deb
 ```
 
+On Debian 13 (trixie), from the GitHub release (1.34 with a fix for
+Plasma 6.3):
+
+```
+wget https://github.com/dschaefer79/plasma-tile-menu/releases/download/v1.34/plasma-tile-menu_1.34+deb13_debian13_amd64.deb
+sudo apt install ./plasma-tile-menu_1.34+deb13_debian13_amd64.deb
+```
+
 The widgets appear in the system tray at the next login, or right away
 after `plasma-tile-menu setup`.
 

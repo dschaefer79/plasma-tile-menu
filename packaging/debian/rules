@@ -10,6 +10,8 @@ D = debian/plasma-tile-menu
 override_dh_auto_install:
 	dh_auto_install --destdir=$(D)
 	install -Dpm 0755 plasma-tile-menu $(D)/usr/bin/plasma-tile-menu
+	# Debian wants the shell at /bin/sh.
+	sed -i '1s|^#!/usr/bin/sh$$|#!/bin/sh|' $(D)/usr/bin/plasma-tile-menu
 	install -Dpm 0644 plasma-tile-menu.desktop $(D)/usr/share/applications/plasma-tile-menu.desktop
 	install -Dpm 0644 plasma-tile-menu-setup.desktop $(D)/etc/xdg/autostart/plasma-tile-menu-setup.desktop
 	install -Dpm 0644 org.dschaefer.tilemenu.desktop $(D)/usr/share/kglobalaccel/org.dschaefer.tilemenu.desktop

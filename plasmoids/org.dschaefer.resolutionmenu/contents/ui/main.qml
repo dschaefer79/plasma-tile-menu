@@ -131,7 +131,12 @@ PlasmoidItem {
             default: return Qt.TopEdge;
             }
         }
-        hideOnWindowDeactivate: true
+        // Close when another window gets the focus. Plasma 6.4 has
+        // hideOnWindowDeactivate for this; 6.3 (Debian 13) does not.
+        onActiveChanged: {
+            if (!active)
+                visible = false;
+        }
         // Only as large as the entries; otherwise the window takes a large
         // default size.
         width: entries.implicitWidth + leftPadding + rightPadding
